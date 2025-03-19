@@ -65,7 +65,6 @@ from vllm.entrypoints.openai.protocol import (ChatCompletionRequest,
                                               TranscriptionRequest,
                                               TranscriptionResponse,
                                               UnloadLoRAAdapterRequest)
-from vllm.entrypoints.openai.reasoning_parsers import ReasoningParserManager
 # yapf: enable
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
 from vllm.entrypoints.openai.serving_completion import OpenAIServingCompletion
@@ -75,15 +74,16 @@ from vllm.entrypoints.openai.serving_models import (BaseModelPath,
                                                     OpenAIServingModels)
 from vllm.entrypoints.openai.serving_pooling import OpenAIServingPooling
 from vllm.entrypoints.openai.serving_score import ServingScores
-from vllm.entrypoints.openai.serving_tokenization import (
-    OpenAIServingTokenization)
-from vllm.entrypoints.openai.serving_transcription import (
-    OpenAIServingTranscription)
+from vllm.entrypoints.openai.serving_tokenization import \
+    OpenAIServingTokenization
+from vllm.entrypoints.openai.serving_transcription import \
+    OpenAIServingTranscription
 from vllm.entrypoints.openai.tool_parsers import ToolParserManager
 from vllm.entrypoints.utils import load_aware_call, with_cancellation
 from vllm.logger import init_logger
-from vllm.transformers_utils.config import (
-    maybe_register_config_serialize_by_value)
+from vllm.reasoning_parser import ReasoningParserManager
+from vllm.transformers_utils.config import \
+    maybe_register_config_serialize_by_value
 from vllm.usage.usage_lib import UsageContext
 from vllm.utils import (Device, FlexibleArgumentParser, get_open_zmq_ipc_path,
                         is_valid_ipv6_address, set_ulimit)
