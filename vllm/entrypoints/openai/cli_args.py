@@ -288,10 +288,10 @@ def validate_parsed_serve_args(args: argparse.Namespace):
 
     # Ref https://api-docs.deepseek.com/guides/reasoning_model
     # tool call and reasoning cannot be enabled at the same time.
-    if args.enable_auto_tool_choice and args.enable_reasoning:
-        raise TypeError(
-            "Error: --enable-auto-tool-choice and "
-            "--enable-reasoning cannot be enabled at the same time")
+    # if args.enable_auto_tool_choice and args.enable_reasoning:
+    #     raise TypeError(
+    #         "Error: --enable-auto-tool-choice and "
+    #         "--enable-reasoning cannot be enabled at the same time")
 
 
 def create_parser_for_docs() -> FlexibleArgumentParser:
