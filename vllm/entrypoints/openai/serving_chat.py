@@ -30,8 +30,8 @@ from vllm.entrypoints.openai.serving_engine import (OpenAIServing,
                                                     clamp_prompt_logprobs)
 from vllm.entrypoints.openai.serving_models import OpenAIServingModels
 from vllm.entrypoints.openai.tool_parsers import ToolParser, ToolParserManager
-from vllm.entrypoints.openai.tool_parsers.mistral_tool_parser import \
-    MistralToolCall
+from vllm.entrypoints.openai.tool_parsers.mistral_tool_parser import (
+    MistralToolCall)
 from vllm.logger import init_logger
 from vllm.outputs import CompletionOutput, RequestOutput
 from vllm.reasoning_parser import ReasoningParser, ReasoningParserManager
@@ -846,6 +846,11 @@ class OpenAIServingChat(OpenAIServing):
             token_ids = output.token_ids
             out_logprobs = output.logprobs
 
+            # Set these below
+            content: Optional[str] = None
+            reasoning_content: Optional[str] = None
+            tool_calls: list[ToolCall] = []
+
             if request.logprobs and request.top_logprobs is not None:
                 assert out_logprobs is not None, "Did not output logprobs"
                 logprobs = self._create_chat_logprobs(
@@ -887,11 +892,15 @@ class OpenAIServingChat(OpenAIServing):
 
             # if auto tools are not enabled, and a named tool choice using
             #   outlines is not being used
-            elif (not self.enable_auto_tools or not self.tool_parser) and \
+            if (not self.enable_auto_tools or not self.tool_parser) and \
                 (not isinstance(request.tool_choice,
                                 ChatCompletionNamedToolChoiceParam
                                 ) and request.tool_choice != "required"):
-                message = ChatMessage(role=role, content=output.text)
+                message = ChatMessage(
+                    role=role,
+                    content=output.text,
+                    reasoning_content=reasoning_content,
+                )
 
             # if the request uses tools and specified a tool choice
             elif request.tool_choice and type(
@@ -906,7 +915,10 @@ class OpenAIServingChat(OpenAIServing):
                         tool_call_class(function=FunctionCall(
                             name=request.tool_choice.function.name,
                             arguments=output.text))
-                    ])
+                    ],
+                    reasoning_content=reasoning_content,
+                )
+                
 
             elif request.tool_choice and request.tool_choice == "required":
                 tool_call_class = MistralToolCall if isinstance(
@@ -924,13 +936,19 @@ class OpenAIServingChat(OpenAIServing):
                             name=tool_call.name,
                             arguments=json.dumps(tool_call.parameters)))
                         for tool_call in tool_calls
-                    ])
+                    ],
+                    reasoning_content=reasoning_content,
+                )
 
             # if the request doesn't use tool choice
             # OR specifies to not use a tool
             elif not request.tool_choice or request.tool_choice == "none":
 
-                message = ChatMessage(role=role, content=output.text)
+                message = ChatMessage(
+                    role=role,
+                    content=output.text,
+                    reasoning_content=reasoning_content,
+                )
 
             # handle when there are tools and tool choice is auto
             elif request.tools and (
@@ -951,14 +969,11 @@ class OpenAIServingChat(OpenAIServing):
                 # call. The same is not true for named function calls
                 auto_tools_called = tool_call_info.tools_called
                 if tool_call_info.tools_called:
-                    message = ChatMessage(role=role,
-                                          content=tool_call_info.content,
-                                          tool_calls=tool_call_info.tool_calls)
-
-                else:
-                    # FOR NOW make it a chat message; we will have to detect
-                    # the type to make it later.
-                    message = ChatMessage(role=role, content=output.text)
+                    message = ChatMessage(
+                        role=role,
+                        tool_calls=tool_call_info.tool_calls,
+                        reasoning_content=reasoning_content,
+                    )
 
             # undetermined case that is still important to handle
             else:
@@ -966,7 +981,11 @@ class OpenAIServingChat(OpenAIServing):
                     "Error in chat_completion_full_generator - cannot determine"
                     " if tools should be extracted. Returning a standard chat "
                     "completion.")
-                message = ChatMessage(role=role, content=output.text)
+                message = ChatMessage(
+                    role=role,
+                    content=output.text,
+                    reasoning_content=reasoning_content,
+                )
 
             choice_data = ChatCompletionResponseChoice(
                 index=output.index,
