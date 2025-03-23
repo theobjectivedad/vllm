@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from transformers import PreTrainedTokenizer
 
     from vllm.config import ModelConfig
-    from vllm.reasoning_parser import ReasoningParser
+    from vllm.model_executor.guided_decoding.reasoner import Reasoner
     from vllm.sampling_params import GuidedDecodingParams
 
 logger = init_logger(__name__)
@@ -37,7 +37,7 @@ def get_local_xgrammar_guided_decoding_logits_processor(
         guided_params: GuidedDecodingParams,
         tokenizer: PreTrainedTokenizer,
         model_config: ModelConfig,
-        reasoner: ReasoningParser | None,
+        reasoner: Reasoner | None,
         max_threads: int = 8):
     config = GrammarConfig.from_guided_params(guided_params=guided_params,
                                               model_config=model_config,
@@ -280,7 +280,7 @@ class GrammarConfig:
 class XGrammarLogitsProcessor:
     """Wrapper class to support pickle protocol"""
     config: GrammarConfig
-    reasoner: ReasoningParser | None = None
+    reasoner: Reasoner | None = None
 
     ctx: xgr.CompiledGrammar | None = None
     tokenizer_info: xgr.TokenizerInfo = None  # type: ignore[assignment]
