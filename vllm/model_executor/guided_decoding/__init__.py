@@ -8,7 +8,6 @@ from vllm.logger import init_logger
 from vllm.model_executor.guided_decoding.utils import (
     convert_lark_to_gbnf, grammar_is_likely_lark,
     has_lmf_unsupported_json_features, has_xgrammar_unsupported_json_features)
-from vllm.platforms import CpuArchEnum
 from vllm.reasoning_parser import ReasoningParserManager
 
 if TYPE_CHECKING:

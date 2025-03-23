@@ -18,8 +18,9 @@
 import copy
 import json
 from collections import defaultdict
+from copy import deepcopy
 from functools import lru_cache
-from typing import Callable, DefaultDict, Dict, List, Optional, Union
+from typing import Any, Callable, DefaultDict, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -190,8 +191,139 @@ class JSONLogitsProcessor(RegexLogitsProcessor):
                 f"Cannot parse schema {schema}. The schema must be either "
                 f"a Pydantic object, a dictionary or a string that contains "
                 f"the JSON Schema specification")
-        regex_string = build_regex_from_schema(schema_str, whitespace_pattern)
+        regex_string = build_regex_from_schema(
+            JSONLogitsProcessor._denormalize_schema(schema_str, max_depth=100),
+            whitespace_pattern,
+        )
         super().__init__(regex_string, tokenizer, reasoner)
+
+    @staticmethod
+    def _denormalize_schema(schema_str: str, max_depth: int) -> str:
+        """
+        De-normalizes a JSON schema string by inlining $defs references and
+        removing them.
+
+        This function processes a JSON schema to resolve all $ref references by
+        replacing them with their corresponding definitions from $defs, and
+        removes all $defs sections. It handles nested $defs and $ref at any
+        level of the schema.
+
+        Args:
+            schema_str: A JSON string representing the schema with potential
+                $defs and $ref.
+            max_depth: Maximum recursion depth to prevent infinite loops with
+                circular references.
+
+        Returns:
+            A JSON string of the de-normalized schema with all $defs and $ref
+                resolved.
+
+        Raises:
+            json.JSONDecodeError: If the input string is not valid JSON.
+            RecursionError: If the recursion depth limit is exceeded.
+        """
+        # Parse the input string into a dictionary
+        schema: Dict[str, Any] = json.loads(schema_str)
+
+        def find_and_extract_defs(
+            obj: Union[Dict[str, Any], List[Any]],
+            defs: Dict[str, Any],
+            depth: int = 0,
+        ) -> None:
+            """
+            Recursively extracts all $defs from the schema and removes them.
+
+            Args:
+                obj: The current schema object being processed (dict or list).
+                defs: Dictionary to store extracted $defs definitions.
+                depth: Current recursion depth.
+
+            Raises:
+                RecursionError: If max_depth is exceeded.
+            """
+            if depth > max_depth:
+                raise RecursionError(
+                    f"Maximum recursion depth {max_depth} "
+                    "exceeded while extracting $defs"
+                )
+
+            if isinstance(obj, dict):
+                if "$defs" in obj:
+                    defs.update(obj["$defs"])
+                    del obj["$defs"]
+                for value in obj.values():
+                    find_and_extract_defs(value, defs, depth + 1)
+            elif isinstance(obj, list):
+                for item in obj:
+                    find_and_extract_defs(item, defs, depth + 1)
+
+            # Implied else - complete
+            logger.info(
+                "Final find_and_extract_defs() recursion depth: %i", depth
+            )
+
+        def resolve_refs(
+            obj: Union[Dict[str, Any], List[Any], Any],
+            defs: Dict[str, Any],
+            depth: int = 0,
+        ) -> Union[Dict[str, Any], List[Any], Any]:
+            """
+            Recursively resolves $ref references by inlining their definitions.
+
+            Args:
+                obj: The current schema object being processed (dict or list).
+                defs: Dictionary of extracted $defs definitions.
+                depth: Current recursion depth.
+
+            Returns:
+                The object with all $ref references resolved.
+
+            Raises:
+                RecursionError: If max_depth is exceeded.
+            """
+            if depth > max_depth:
+                raise RecursionError(
+                    f"Maximum recursion depth of {max_depth} "
+                    "exceeded while resolving $refs"
+                )
+
+            if isinstance(obj, dict):
+                if "$ref" in obj:
+                    ref_path = obj["$ref"]
+                    if ref_path.startswith("#/$defs/"):
+                        def_key = ref_path.split("/")[-1]
+                        if def_key in defs:
+                            resolved = resolve_refs(
+                                deepcopy(defs[def_key]),
+                                defs,
+                                depth + 1,
+                            )
+                            # Remove all keys, including $ref
+                            obj.clear()
+
+                            # Inline the resolved definition
+                            obj.update(resolved)
+                    return obj
+                return {
+                    k: resolve_refs(v, defs, depth + 1) for k, v in obj.items()
+                }
+            elif isinstance(obj, list):
+                return [resolve_refs(item, defs, depth + 1) for item in obj]
+
+            # Implied else - complete
+            logger.info("Final resolve_refs() recursion depth: %i", depth)
+
+            return obj
+
+        # Extract all $defs from the schema
+        defs: Dict[str, Any] = {}
+        find_and_extract_defs(obj=schema, defs=defs)
+
+        # Resolve all $ref references
+        denormalized_schema = resolve_refs(obj=schema, defs=defs)
+
+        # Return the de-normalized schema as a string
+        return json.dumps(denormalized_schema)
 
 
 class CFGLogitsProcessor(BaseLogitsProcessor):
