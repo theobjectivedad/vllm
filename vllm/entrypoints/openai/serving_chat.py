@@ -130,6 +130,11 @@ class OpenAIServingChat(OpenAIServing):
         for the API specification. This API mimics the OpenAI
         Chat Completion API.
         """
+
+        # Giant hack to make PydanticAI work
+        if request.tool_choice == "required":
+            request.tool_choice = "auto"
+
         error_check_ret = await self._check_model(request)
         if error_check_ret is not None:
             logger.error("Error with model %s", error_check_ret)
