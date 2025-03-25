@@ -192,7 +192,7 @@ class JSONLogitsProcessor(RegexLogitsProcessor):
                 f"a Pydantic object, a dictionary or a string that contains "
                 f"the JSON Schema specification")
         regex_string = build_regex_from_schema(
-            JSONLogitsProcessor._denormalize_schema(schema_str, max_depth=100),
+            JSONLogitsProcessor._denormalize_schema(schema_str, max_depth=200),
             whitespace_pattern,
         )
         super().__init__(regex_string, tokenizer, reasoner)
@@ -258,7 +258,7 @@ class JSONLogitsProcessor(RegexLogitsProcessor):
                     find_and_extract_defs(item, defs, depth + 1)
 
             # Implied else - complete
-            logger.info(
+            logger.debug(
                 "Final find_and_extract_defs() recursion depth: %i", depth
             )
 
@@ -311,7 +311,7 @@ class JSONLogitsProcessor(RegexLogitsProcessor):
                 return [resolve_refs(item, defs, depth + 1) for item in obj]
 
             # Implied else - complete
-            logger.info("Final resolve_refs() recursion depth: %i", depth)
+            logger.debug("Final resolve_refs() recursion depth: %i", depth)
 
             return obj
 
