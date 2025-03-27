@@ -229,7 +229,10 @@ class TransformersModel(nn.Module):
         Apply the model's tensor parallelization plan.
         Currently only supports linear layers.
         """
-        if self.tp_size > 1 and self.config.base_model_tp_plan is None:
+        if not self.model.supports_tp_plan:
+            if self.tp_size <= 1:
+                return
+
             raise ValueError(
                 f"{type(self.model)} does not support tensor parallel yet!")
 
@@ -342,9 +345,11 @@ class TransformersModel(nn.Module):
         params_dict = dict(self.named_parameters())
         loaded_params = set[str]()
         for name, loaded_weight in weights:
-            # Necessary for some models which use remote code
-            if not name.startswith(prefix := self.model.base_model_prefix):
-                name = maybe_prefix(prefix, name)
+            # Use "model" instead of base_model_prefix because
+            # the base model attribute in vLLM is always `model`
+            if not name.startswith(prefix := "model."):
+                name = prefix + name
+
             if is_pp_missing_parameter(name, self):
                 continue
             if name in params_dict:
