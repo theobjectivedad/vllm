@@ -102,6 +102,7 @@ if TYPE_CHECKING:
     VLLM_V0_USE_OUTLINES_CACHE: bool = False
     VLLM_TPU_DISABLE_TOPK_TOPP_OPTIMIZATION: bool = False
     VLLM_TPU_BUCKET_PADDING_GAP: int = 0
+    VLLM_OUTLINES_DENORMALIZE_RECURSION_CAP: int = 0
 
 
 def get_default_cache_root():
@@ -649,6 +650,13 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # an environment with potentially malicious users.
     "VLLM_V0_USE_OUTLINES_CACHE":
     lambda: os.environ.get("VLLM_V0_USE_OUTLINES_CACHE", "0") == "1",
+
+    # JSONLogitsProcessor will attempt to denormalize JSON schemas that contain
+    # sub-schemas to work properly with Outlines. This is necessarily a
+    # recursive operation and the number of recursion levels is controlled by
+    # this cap. When set to 0, the denormalization will be disabled (default).
+    "VLLM_OUTLINES_DENORMALIZE_RECURSION_CAP":
+    lambda: int(os.environ.get("VLLM_OUTLINES_DENORMALIZE_RECURSION_CAP", 0)),
 
     # If set, disables TPU-specific optimization for top-k & top-p sampling
     "VLLM_TPU_DISABLE_TOPK_TOPP_OPTIMIZATION":
